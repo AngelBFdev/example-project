@@ -1,32 +1,72 @@
-import { LoginDTO, UserModel, LoginEmailDTO, LoginUserNameDTO } from "../models/user";
+import {
+  LoginDTO,
+  LoginEmailDTO,
+  LoginUsernameDTO,
+  UserModel,
+} from "../models/user";
 
-// export const getUserByID=async(id:string) =>{
-//   if (id === "") return;
+import jwt from "jsonwebtoken";
 
-//   const user = await UserModel.findById(id);
+const SECRET_KEY = process.env.SECRET_KEY || "";
 
-//   return user;
-// };
+export const login = async ({ password, email, userName }: LoginDTO) => {
+  if (!password)
+    return {
+      status: 400,
+      error: "password is required",
+    };
 
-export const login=async({password,email,userName}:LoginDTO) =>{
-  if(!password) return "";
+  let user = undefined;
 
-  if (email) return await loginEmail({email,password})
+  if (email) {
+    user = await loginEmail({ email, password });
+  } else if (userName) {
+    user = await loginUserName({ userName, password });
+  } else {
+    return {
+      status: 400,
+      error: "you have to send email or userName field",
+    };
+  }
 
-  else if(userName) return await loginUserName({userName,password})
-  return "";
-};
+  if (!user)
+    return {
+      status: 404,
+      error: "user not found",
+    };
 
-const loginEmail = async ({email,password}:LoginEmailDTO) =>{
-  const user = await UserModel.findOne({email});
-  if(!user || user.password !== password) return;
+  const token = jwt.sign(
+    {
+      _id: user._id,
+      email,
+    },
+    SECRET_KEY,
+    {
+      expiresIn: "3h",
+    }
+  );
+
+  user = {
+    userName: user.userName,
+    email: user.email,
+    token,
+  };
 
   return user;
 };
 
-const loginUserName = async ({userName,password}:LoginUserNameDTO)=>{
-  const user = await UserModel.findOne({userName});
-  if(!user || user.password !== password) return;
+const loginEmail = async ({ email, password }: LoginEmailDTO) => {
+  const user = await UserModel.findOne({ email });
+
+  if (!user || user.password !== password) return;
 
   return user;
-}
+};
+
+const loginUserName = async ({ userName, password }: LoginUsernameDTO) => {
+  const user = await UserModel.findOne({ userName });
+
+  if (!user || user.password !== password) return;
+
+  return user;
+};
